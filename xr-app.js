@@ -1,6 +1,6 @@
-import {createSequence} from './xr-sequence.js';
-import {GlanceScene} from './xr-scene.js';
-import {cargoColor, cargoInk} from './cargo-colors.js';
+import {createSequence, conciseDetails} from './xr-sequence.js?v=2';
+import {GlanceScene} from './xr-scene.js?v=2';
+import {cargoColor} from './cargo-colors.js';
 
 const $ = id => document.getElementById(id);
 let sequence, scene, supported = false, starting = false, cameraStream = null;
@@ -40,22 +40,14 @@ async function startCamera() {
 
 function update() {
   const step = sequence.current(), item = step.item;
-  $('row').textContent = step.stage.title;
+  const summary = conciseDetails(step);
   $('counter').textContent = `${step.index + 1} / ${step.total}`;
-  $('item-badge').textContent = String(item.number).padStart(2, '0');
-  $('item-badge').style.background = cargoColor(item);
-  $('item-badge').style.color = cargoInk(item);
-  $('item-label').textContent = item.label;
-  $('item-name').textContent = item.name;
-  $('location').textContent = step.location;
-  $('weight').textContent = `${item.weight} kg`;
-  $('pallets').textContent = `${item.pallets} EUR ${item.pallets === 1 ? 'pallet' : 'pallets'}`;
-  $('dimensions').textContent = `${item.length} × ${item.width} × ${item.height} mm`;
-  $('constraint').textContent = `Upright · no rotation${item.note ? ' · ' + item.note : ''}`;
-  $('stack').textContent = step.stack; $('stack').hidden = !step.stack;
+  $('item-label').textContent = summary.title; $('item-label').title = summary.title;
+  $('item-detail').textContent = summary.detail; $('item-detail').title = summary.detail;
+  $('item-information').style.borderLeftColor = cargoColor(item);
   $('previous').disabled = step.index === 0;
   $('next').disabled = step.index === step.total - 1;
-  $('scene').setAttribute('aria-label', `Load plan: ${item.label}, ${step.location}`);
+  $('scene').setAttribute('aria-label', `Close-up: ${item.label}, ${step.location}`);
   scene?.update(step);
 }
 
@@ -140,7 +132,7 @@ try {
   $('enter-xr').textContent = 'Mixed reality unavailable';
 }
 
-// Shares the existing app's offline asset cache, but never reads/writes its progress.
+// Uses LoadXR's own asset cache, without storing loading progress.
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }

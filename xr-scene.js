@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {cargoColor, cargoInk} from './cargo-colors.js';
+import {cargoColor} from './cargo-colors.js';
+import {conciseDetails} from './xr-sequence.js?v=2';
 
 function texture(canvas) {
   const map = new THREE.CanvasTexture(canvas);
@@ -12,18 +13,6 @@ function canvasPlane(width, height, canvas) {
     new THREE.MeshBasicMaterial({map: texture(canvas), transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
 }
 
-function label(text, width = 1.4, height = .5, color = '#3c555c', background = null) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 320; canvas.height = 100;
-  const ctx = canvas.getContext('2d');
-  if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, 320, 100); }
-  ctx.fillStyle = color; ctx.font = 'bold 58px Arial'; ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle'; ctx.fillText(text, 160, 52);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture(canvas), depthTest: false, depthWrite: false, toneMapped: false}));
-  sprite.scale.set(width, height, 1);
-  return sprite;
-}
-
 // Model coordinates match the web guide: x from the front, y from the left,
 // and z upwards, all supplied in millimetres. Three.js geometry uses metres.
 function buildPlan(shipment, renderOrder = 0) {
@@ -32,9 +21,6 @@ function buildPlan(shipment, renderOrder = 0) {
   const floor = new THREE.Mesh(new THREE.BoxGeometry(L, .06, W),
     new THREE.MeshBasicMaterial({color: '#d5dfce'}));
   floor.position.y = -.04; root.add(floor);
-  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(L, shipment.trailer.height / 1000, W)),
-    new THREE.LineBasicMaterial({color: '#9aafa4', transparent: true, opacity: .5}));
-  frame.position.y = shipment.trailer.height / 2000; root.add(frame);
   for (const item of shipment.items) {
     const p = shipment.placements.find(p => p.id === item.id);
     const l = item.length / 1000, w = item.width / 1000, h = item.height / 1000;
@@ -46,43 +32,39 @@ function buildPlan(shipment, renderOrder = 0) {
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
       new THREE.LineBasicMaterial({color: '#1b3039', transparent: true}));
     edge.position.copy(body.position); root.add(edge);
-    const number = label(String(item.number).padStart(2, '0'), .85, .45, cargoInk(item), cargoColor(item));
-    number.position.copy(body.position); number.position.y += h / 2 + .4; root.add(number);
-    cargo.set(item.id, {body, edge, number});
-  }
-  for (const [text, x] of [['FRONT', -L / 2 - .8], ['REAR', L / 2 + .8]]) {
-    const marker = label(text, 1.5, .42); marker.position.set(x, .1, 0); root.add(marker);
+    cargo.set(item.id, {body, edge});
   }
   root.traverse(object => object.renderOrder = renderOrder);
-  return {root, cargo};
+  return {root, cargo, floor, L, W};
 }
 
-function highlight(plan, id) {
-  for (const [key, {body, edge, number}] of plan.cargo) {
-    const active = key === id;
-    body.material.opacity = active ? 1 : .085;
+function focusItem(plan, step) {
+  const bounds = new THREE.Box3();
+  for (const [key, {body, edge}] of plan.cargo) {
+    const active = key === step.item.id, support = key === step.item.placement.base;
+    body.visible = edge.visible = active || support;
+    body.material.opacity = active ? 1 : .12;
     body.material.depthWrite = active;
-    edge.material.opacity = active ? 1 : .18;
-    number.visible = active;
+    edge.material.opacity = active ? 1 : .25;
+    if (body.visible) {
+      body.geometry.computeBoundingBox();
+      bounds.union(body.geometry.boundingBox.clone().translate(body.position));
+    }
   }
+  const size = bounds.getSize(new THREE.Vector3()), centre = bounds.getCenter(new THREE.Vector3());
+  plan.floor.scale.set(size.x / plan.L, 1, size.z / plan.W);
+  plan.floor.position.set(centre.x, bounds.min.y - .04, centre.z);
+  bounds.min.y -= .08;
+  return bounds;
 }
 
-function wrapped(ctx, text, x, y, width, lineHeight, maxLines = 2) {
-  const words = String(text).split(/\s+/), lines = [];
-  let line = '';
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width > width && line) { lines.push(line); line = word; }
-    else line = candidate;
+function textLine(ctx, text, x, y, width) {
+  let line = text;
+  if (ctx.measureText(line).width > width) {
+    while (line && ctx.measureText(`${line}…`).width > width) line = line.slice(0, -1);
+    line += '…';
   }
-  if (line) lines.push(line);
-  lines.slice(0, maxLines).forEach((line, i) => {
-    if (i === maxLines - 1 && lines.length > maxLines) {
-      while (ctx.measureText(`${line}…`).width > width) line = line.slice(0, -1);
-      line += '…';
-    }
-    ctx.fillText(line, x, y + i * lineHeight);
-  });
+  ctx.fillText(line, x, y);
 }
 
 export class GlanceScene {
@@ -104,19 +86,16 @@ export class GlanceScene {
     this.preview = buildPlan(shipment); this.scene.add(this.preview.root);
     this.panel = new THREE.Group(); this.panel.visible = false; this.scene.add(this.panel);
     this.panelCanvas = document.createElement('canvas');
-    this.panelCanvas.width = 900; this.panelCanvas.height = 1000;
-    // About 24 degrees wide; its left edge stays to the right of straight ahead.
-    this.backplate = canvasPlane(.81, .90, this.panelCanvas);
+    this.panelCanvas.width = 900; this.panelCanvas.height = 690;
+    // Compact upper-right glance panel; the centre of the view stays clear.
+    this.backplate = canvasPlane(.60, .46, this.panelCanvas);
     this.backplate.renderOrder = 10; this.panel.add(this.backplate);
     this.miniature = buildPlan(shipment, 11);
-    this.miniature.root.scale.setScalar(.033);
-    this.miniature.root.rotation.set(.78, -.25, -.10);
-    this.miniature.root.position.set(-.04, .225, .025);
     this.panel.add(this.miniature.root);
     this.buttons = [-1, 1].map((delta, i) => {
       const canvas = document.createElement('canvas'); canvas.width = 420; canvas.height = 120;
-      const button = canvasPlane(.345, .098, canvas);
-      button.position.set(i === 0 ? -.193 : .193, -.36, .018);
+      const button = canvasPlane(.263, .087, canvas);
+      button.position.set(i === 0 ? -.142 : .142, -.172, .018);
       button.renderOrder = 12; button.userData.delta = delta; button.userData.canvas = canvas;
       this.panel.add(button); return button;
     });
@@ -158,37 +137,47 @@ export class GlanceScene {
     if (!w || !h) return;
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
-    // Fit the whole miniature at every phone/desktop aspect ratio.
-    const distance = Math.max(17, 13 / this.camera.aspect);
-    this.camera.position.set(distance * .34, distance * .64, distance * .67);
-    this.camera.lookAt(0, 1, 0);
+    this.fitCurrentItem();
     this.dirty = true;
   }
 
+  fitCurrentItem() {
+    if (!this.focusBounds || this.renderer.xr.isPresenting) return;
+    const bounds = this.focusBounds, centre = bounds.getCenter(new THREE.Vector3());
+    const direction = new THREE.Vector3(.9, .65, 1.15).normalize();
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
+    const up = new THREE.Vector3().crossVectors(direction, right);
+    const tan = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    let distance = .1;
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+      const point = new THREE.Vector3(x, y, z).sub(centre), depth = point.dot(direction);
+      distance = Math.max(distance, depth + Math.abs(point.dot(right)) / (tan * this.camera.aspect * .85), depth + Math.abs(point.dot(up)) / (tan * .80));
+    }
+    this.camera.position.copy(centre).addScaledVector(direction, distance * 1.04);
+    this.camera.lookAt(centre);
+  }
+
   update(step) {
-    highlight(this.preview, step.item.id); highlight(this.miniature, step.item.id);
+    this.focusBounds = focusItem(this.preview, step);
+    const bounds = focusItem(this.miniature, step);
+    // Fit the rotated current item into the model region of the headset panel.
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(.48, -.62, -.08));
+    const rotated = bounds.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(rotation));
+    const size = rotated.getSize(new THREE.Vector3()), centre = rotated.getCenter(new THREE.Vector3());
+    const scale = Math.min(.40 / size.x, .205 / size.y, .23 / size.z);
+    this.miniature.root.quaternion.copy(rotation); this.miniature.root.scale.setScalar(scale);
+    this.miniature.root.position.copy(centre).multiplyScalar(-scale).add(new THREE.Vector3(-.045, .080, .04));
     this.step = step;
+    this.fitCurrentItem();
+    const summary = conciseDetails(step);
     const ctx = this.panelCanvas.getContext('2d');
-    ctx.clearRect(0, 0, 900, 1000);
-    ctx.fillStyle = '#f2f4ed'; ctx.beginPath(); ctx.roundRect(0, 0, 900, 1000, 32); ctx.fill();
-    ctx.fillStyle = '#4a6267'; ctx.font = 'bold 29px Arial';
-    ctx.fillText(step.stage.title, 46, 54);
-    ctx.textAlign = 'right'; ctx.fillText(`${step.index + 1} / ${step.total}`, 854, 54); ctx.textAlign = 'left';
-    ctx.fillStyle = '#53676a'; ctx.font = 'bold 19px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('POSITION IN LOAD PLAN', 450, 322); ctx.textAlign = 'left';
-    ctx.fillStyle = '#d5ded1'; ctx.fillRect(35, 346, 830, 2);
-    ctx.fillStyle = cargoColor(step.item); ctx.beginPath(); ctx.roundRect(46, 375, 95, 95, 20); ctx.fill();
-    ctx.fillStyle = cargoInk(step.item); ctx.font = 'bold 47px Arial'; ctx.textAlign = 'center';
-    ctx.fillText(String(step.item.number).padStart(2, '0'), 94, 438); ctx.textAlign = 'left';
-    ctx.fillStyle = '#172b30'; ctx.font = 'bold 42px Arial'; ctx.fillText(step.item.label, 165, 410);
-    ctx.font = '27px Arial'; wrapped(ctx, step.item.name, 165, 450, 685, 34, 2);
-    ctx.font = 'bold 31px Arial'; ctx.fillText(step.location, 46, 538);
-    ctx.font = 'bold 35px Arial'; ctx.fillText(`${step.item.weight} kg`, 46, 593);
-    ctx.font = '28px Arial'; ctx.fillText(`${step.item.pallets} EUR ${step.item.pallets === 1 ? 'pallet' : 'pallets'}`, 300, 593);
-    ctx.fillText(`${step.item.length} × ${step.item.width} × ${step.item.height} mm`, 46, 640);
-    ctx.fillStyle = '#425c61'; ctx.font = '26px Arial';
-    wrapped(ctx, `Upright · no rotation${step.item.note ? ' · ' + step.item.note : ''}`, 46, 690, 808, 33, 2);
-    if (step.stack) wrapped(ctx, step.stack, 46, 775, 808, 33, 2);
+    ctx.clearRect(0, 0, 900, 690);
+    ctx.fillStyle = '#f2f4ed'; ctx.beginPath(); ctx.roundRect(0, 0, 900, 690, 28); ctx.fill();
+    ctx.fillStyle = '#506366'; ctx.font = '27px Arial'; ctx.textAlign = 'right';
+    ctx.fillText(`${step.index + 1} / ${step.total}`, 854, 46); ctx.textAlign = 'left';
+    ctx.fillStyle = cargoColor(step.item); ctx.fillRect(32, 390, 6, 108);
+    ctx.fillStyle = '#172b30'; ctx.font = 'bold 35px Arial'; textLine(ctx, summary.title, 53, 432, 795);
+    ctx.fillStyle = '#405a60'; ctx.font = '31px Arial'; textLine(ctx, summary.detail, 53, 480, 795);
     this.backplate.material.map.needsUpdate = true;
     this.buttons.forEach((button, i) => {
       const enabled = i === 0 ? step.index > 0 : step.index < step.total - 1;
@@ -218,7 +207,7 @@ export class GlanceScene {
       this.renderer.xr.updateCamera(this.camera);
       const head = this.renderer.xr.getCamera();
       head.matrixWorld.decompose(this.headPosition, this.headQuaternion, this.headScale);
-      this.panel.position.set(.70, .36, -1.8).applyQuaternion(this.headQuaternion).add(this.headPosition);
+      this.panel.position.set(.70, .45, -1.8).applyQuaternion(this.headQuaternion).add(this.headPosition);
       this.panel.quaternion.copy(this.headQuaternion);
       this.panel.updateMatrixWorld(true);
       for (const controller of this.controllers) {

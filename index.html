@@ -7,27 +7,22 @@
   <meta name="description" content="A simple mixed reality loading guide. Glance at the current item and move through the loading sequence.">
   <title>LoadXR</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./xr.css?v=1">
+  <link rel="stylesheet" href="./xr.css?v=2">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-  <script type="module" src="./xr-app.js?v=1"></script>
+  <script type="module" src="./xr-app.js?v=2"></script>
 </head>
 <body>
   <video id="camera-feed" autoplay muted playsinline aria-hidden="true" hidden></video>
-  <header class="page-header"><a href="https://timohynninen.github.io/loadguide/" aria-label="Open the original Load Guide"><img src="./icon.svg" alt="" width="27" height="27">Load Guide <span>XR</span></a><button id="enter-xr" disabled>Checking mixed reality…</button></header>
+  <header class="page-header"><button id="enter-xr" disabled>Checking mixed reality…</button></header>
   <main>
     <div class="preview-note"><span class="status-dot"></span><p id="xr-status" role="status">Preparing the loading guide…</p></div>
     <section class="glance-card" aria-label="Current loading item">
-      <div class="card-top"><span id="row">Loading sequence</span><span id="counter">— / —</span></div>
-      <div class="plan-view"><div id="scene" role="img" aria-label="Load plan showing the current item"><p>Preparing the load plan…</p></div><span class="plan-caption">POSITION IN LOAD PLAN</span></div>
+      <div class="plan-view"><div id="scene" role="img" aria-label="Current item close-up"><p>Preparing the item…</p></div><span id="counter" class="counter">— / —</span></div>
       <div id="item-information" class="item-information" aria-live="polite" aria-atomic="true">
-        <div class="item-heading"><span id="item-badge" class="item-badge">—</span><div><h1 id="item-label">Loading…</h1><p id="item-name"></p></div></div>
-        <p id="location" class="location"></p>
-        <div class="facts"><strong id="weight"></strong><span id="pallets"></span><span id="dimensions"></span></div>
-        <p id="constraint" class="constraint"></p><p id="stack" class="stack" hidden></p>
+        <h1 id="item-label">Loading…</h1><p id="item-detail"></p>
       </div>
       <nav class="sequence-controls" aria-label="Item load sequence"><button id="previous" disabled><span aria-hidden="true">←</span> Previous</button><button id="next" disabled>Next <span aria-hidden="true">→</span></button></nav>
     </section>
-    <p class="placement-note">In mixed reality, this panel sits above and to the right of your view.</p>
   </main>
   <noscript>This loading guide needs JavaScript enabled.</noscript>
 </body>

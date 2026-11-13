@@ -18,11 +18,19 @@ export function createSequence(shipment) {
         : upper
           ? `${upper.label} above · ${item.weight + upper.weight} kg combined · ${item.maxAbove} kg upper limit`
           : '';
-      return {item, stage, index, total: entries.length, location: locationText(item, shipment.trailer), stack};
+      return {item, stage, index, total: entries.length, location: locationText(item, shipment.trailer), stack, baseLabel: base?.label || ''};
     },
     move(delta) {
       index = Math.max(0, Math.min(entries.length - 1, index + delta));
       return this.current();
     }
+  };
+}
+
+export function conciseDetails(step) {
+  const [lanes, rows] = step.location.split(' · ');
+  return {
+    title: `${step.item.label} · ${step.item.name}`,
+    detail: `${step.item.weight} kg · ${rows}${step.baseLabel ? ` · on ${step.baseLabel}` : ` · ${lanes.replaceAll(' + ', '/')}`}`
   };
 }
