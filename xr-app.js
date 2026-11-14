@@ -1,5 +1,5 @@
-import {createSequence, conciseDetails} from './xr-sequence.js?v=2';
-import {GlanceScene} from './xr-scene.js?v=2';
+import {createSequence, conciseDetails} from './xr-sequence.js?v=3';
+import {GlanceScene} from './xr-scene.js?v=3';
 import {cargoColor} from './cargo-colors.js';
 
 const $ = id => document.getElementById(id);
@@ -47,7 +47,7 @@ function update() {
   $('item-information').style.borderLeftColor = cargoColor(item);
   $('previous').disabled = step.index === 0;
   $('next').disabled = step.index === step.total - 1;
-  $('scene').setAttribute('aria-label', `Close-up: ${item.label}, ${step.location}`);
+  $('scene').setAttribute('aria-label', `Current item ${item.label}, with its loading rows and the previous row${step.context.showFront ? ', trailer front visible' : ''}`);
   scene?.update(step);
 }
 

@@ -1,5 +1,5 @@
-const CACHE='loadxr-v2';
-const FILES=['./','./index.html','./xr.css?v=2','./xr-app.js?v=2','./xr-sequence.js?v=2','./xr-scene.js?v=2','./cargo-colors.js','./model.js','./example.json','./icon.svg','./vendor/three.module.js','./vendor/three.core.js'];
+const CACHE='loadxr-v3';
+const FILES=['./','./index.html','./xr.css?v=3','./xr-app.js?v=3','./xr-sequence.js?v=3','./xr-scene.js?v=3','./xr-layout.js?v=3','./cargo-colors.js','./model.js','./example.json','./icon.svg','./vendor/three.module.js','./vendor/three.core.js'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('loadxr-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{

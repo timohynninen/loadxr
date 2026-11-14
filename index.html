@@ -7,9 +7,9 @@
   <meta name="description" content="A simple mixed reality loading guide. Glance at the current item and move through the loading sequence.">
   <title>LoadXR</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./xr.css?v=2">
+  <link rel="stylesheet" href="./xr.css?v=3">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-  <script type="module" src="./xr-app.js?v=2"></script>
+  <script type="module" src="./xr-app.js?v=3"></script>
 </head>
 <body>
   <video id="camera-feed" autoplay muted playsinline aria-hidden="true" hidden></video>
@@ -21,7 +21,7 @@
       <div id="item-information" class="item-information" aria-live="polite" aria-atomic="true">
         <h1 id="item-label">Loading…</h1><p id="item-detail"></p>
       </div>
-      <nav class="sequence-controls" aria-label="Item load sequence"><button id="previous" disabled><span aria-hidden="true">←</span> Previous</button><button id="next" disabled>Next <span aria-hidden="true">→</span></button></nav>
+      <nav class="sequence-controls" aria-label="Item load sequence"><button id="next" disabled>Next <span aria-hidden="true">→</span></button><button id="previous" disabled><span aria-hidden="true">←</span> Previous</button></nav>
     </section>
   </main>
   <noscript>This loading guide needs JavaScript enabled.</noscript>
